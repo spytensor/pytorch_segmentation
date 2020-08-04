@@ -1,0 +1,5 @@
+segmentation-models-pytorch
+albumentations
+tensorboardX
+progress
+torch>=1.4.0
