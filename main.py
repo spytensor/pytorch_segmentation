@@ -15,6 +15,7 @@ from utils.losses import *
 from utils.optimizers import get_optimizer
 from utils.utils import AverageMeter,get_lr,iou_metric,dice_metric,save_checkpoint
 from utils.logger import Logger
+from utils.metrics import Evaluator
 from utils.warmup import GradualWarmupScheduler
 from sklearn.model_selection import train_test_split
 from albumentations import pytorch as AT
@@ -26,7 +27,7 @@ from tensorboardX import SummaryWriter
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 warnings.filterwarnings("ignore")
 os.environ['CUDA_VISIBLE_DEVICES'] = configs.gpu_id
-
+evaluator = Evaluator(configs.num_classes)
 # set random seed
 def seed_everything(seed):
     random.seed(seed)
@@ -151,7 +152,7 @@ def main():
         is_best_dice = valid_dice > best_dice
         best_iou = max(valid_iou, best_iou)
         best_dice = max(valid_dice,best_dice)   
-        print("Best Iou: {} ,Best Dice: {}".format(best_iou,best_dice))
+        print("Best {}: {} ,Best Dice: {}".format(configs.metric,,best_iou,best_dice))
         save_checkpoint({
             'state_dict': model.state_dict(),
         },is_best_iou,is_best_dice)
@@ -166,7 +167,7 @@ def train(train_loader, model, criterion, optimizer, epoch,writer):
     Dice_coeff = AverageMeter()
     Iou = AverageMeter()
     end = time.time()
-
+    evaluator.reset()
     bar = Bar('Training: ', max=len(train_loader))
     for batch_idx, (inputs, targets) in enumerate(train_loader):
         # measure data loading time
@@ -183,7 +184,15 @@ def train(train_loader, model, criterion, optimizer, epoch,writer):
         # update
         losses.update(loss.item(), inputs.size(0))
         Dice_coeff.update(dice_batch.item(), inputs.size(0))
-        Iou.update(iou_batch.mean().item(), inputs.size(0))
+        target = targets.cpu().numpy()                                                                                                                              
+        pred = np.argmax(pred, axis=1)                                                                                                                              
+        target = np.argmax(target, axis=1)                                                                                                                          
+        evaluator.add_batch(target, pred)      
+        if configs.metric == "mIoU":
+            iou_value = evaluator.Mean_Intersection_over_Union()
+        else:
+            iou_value = evaluator.Frequency_Weighted_Intersection_over_Union() 
+        Iou.update(iou_value, inputs.size(0)) 
 
         # compute gradient and do SGD step
         optimizer.zero_grad()
@@ -197,7 +206,7 @@ def train(train_loader, model, criterion, optimizer, epoch,writer):
         end = time.time()
 
         # plot progress
-        bar.suffix  = '({batch}/{size}) Data: {data:.3f}s | Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss: {loss:.4f} | Dice_coeff: {Dice_coeff: .4f} | Iou: {Iou: .4f}'.format(
+        bar.suffix  = '({batch}/{size}) Data: {data:.3f}s | Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss: {loss:.4f} | Dice_coeff: {Dice_coeff: .4f} | {}: {Iou: .4f}'.format(
                     batch=batch_idx + 1,
                     size=len(train_loader),
                     data=data_time.val,
@@ -206,10 +215,11 @@ def train(train_loader, model, criterion, optimizer, epoch,writer):
                     eta=bar.eta_td,
                     loss=losses.avg,
                     Dice_coeff=Dice_coeff.avg,
+                    configs.metric,
                     Iou=Iou.avg,
                     )
         writer.add_scalar("Train-Loss",losses.avg,epoch)
-        writer.add_scalar("Train-Iou",Iou.avg,epoch)
+        writer.add_scalar("Train-%s"%configs.metric,Iou.avg,epoch)
         writer.add_scalar("Train-Dice",Dice_coeff.avg,epoch)
 
         bar.next()
@@ -227,7 +237,7 @@ def eval(valid_loader, model, criterion, epoch,writer):
     Dice_coeff = AverageMeter()
     Iou = AverageMeter()
     end = time.time()
-
+    evaluator.reset()
     bar = Bar('Validing: ', max=len(valid_loader))
     with torch.no_grad():
         for batch_idx, (inputs, targets) in enumerate(valid_loader):
@@ -245,13 +255,21 @@ def eval(valid_loader, model, criterion, epoch,writer):
             # update
             losses.update(loss.item(), inputs.size(0))
             Dice_coeff.update(dice_batch.item(), inputs.size(0))
-            Iou.update(iou_batch.mean().item(), inputs.size(0))
+            target = targets.cpu().numpy()                                                                                                                              
+            pred = np.argmax(pred, axis=1)                                                                                                                              
+            target = np.argmax(target, axis=1)                                                                                                                          
+            evaluator.add_batch(target, pred)      
+            if configs.metric == "mIoU":
+                iou_value = evaluator.Mean_Intersection_over_Union()
+            else:
+                iou_value = evaluator.Frequency_Weighted_Intersection_over_Union() 
+            Iou.update(iou_value, inputs.size(0)) 
             # measure elapsed time
             batch_time.update(time.time() - end)
             end = time.time()
 
             # plot progress
-            bar.suffix  = '({batch}/{size}) Data: {data:.3f}s | Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss: {loss:.4f} | Dice_coeff: {Dice_coeff: .4f} | Iou: {Iou: .4f}'.format(
+            bar.suffix  = '({batch}/{size}) Data: {data:.3f}s | Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss: {loss:.4f} | Dice_coeff: {Dice_coeff: .4f} | {}: {Iou: .4f}'.format(
                         batch=batch_idx + 1,
                         size=len(valid_loader),
                         data=data_time.val,
@@ -260,11 +278,12 @@ def eval(valid_loader, model, criterion, epoch,writer):
                         eta=bar.eta_td,
                         loss=losses.avg,
                         Dice_coeff=Dice_coeff.avg,
+                        configs.metric,
                         Iou=Iou.avg,
                         )
             bar.next()
             writer.add_scalar("Valid-Loss",losses.avg,epoch)
-            writer.add_scalar("Valid-Iou",Iou.avg,epoch)
+            writer.add_scalar("Valid-%s"%configs.metric,,Iou.avg,epoch)
             writer.add_scalar("Valid-Dice",Dice_coeff.avg,epoch)
         bar.finish()
     return (losses.avg, Dice_coeff.avg, Iou.avg)
