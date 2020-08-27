@@ -28,7 +28,7 @@ class DefaultConfigs(object):
     encoder_weights = "imagenet"
     optim = "adam"        # "adam","radam","novograd",sgd","ranger","ralamb","over9000","lookahead","lamb"
     loss_func = "BCEWithLogitsLoss" # see ./losses/README.md
-    metric = "mIOU",#mIOU,FWIou
+    metric = "mIoU",#mIOU,FWIou
     use_strong_aug = False  # use strong aug for common dataset
     lr_scheduler = "step" # "on_iou","on_dice","on_loss","cosine"
     activation = None 
