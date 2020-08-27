@@ -95,6 +95,8 @@ def main():
     encoder_weights=configs.encoder_weights, 
     classes=configs.num_classes, 
     activation=configs.activation)
+    if len(configs.gpu_id)>1:
+        model = nn.DataParallel(model)
     model.cuda()
     # get files
     filenames = glob(configs.dataset+"masks/*")
