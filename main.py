@@ -154,7 +154,7 @@ def main():
         is_best_dice = valid_dice > best_dice
         best_iou = max(valid_iou, best_iou)
         best_dice = max(valid_dice,best_dice)   
-        print("Best {}: {} ,Best Dice: {}".format(configs.metric,,best_iou,best_dice))
+        print("Best {}: {} ,Best Dice: {}".format(configs.metric,best_iou,best_dice))
         save_checkpoint({
             'state_dict': model.state_dict(),
         },is_best_iou,is_best_dice)
@@ -186,7 +186,8 @@ def train(train_loader, model, criterion, optimizer, epoch,writer):
         # update
         losses.update(loss.item(), inputs.size(0))
         Dice_coeff.update(dice_batch.item(), inputs.size(0))
-        target = targets.cpu().numpy()                                                                                                                              
+        target = targets.cpu().numpy() 
+        pred = outputs.data.cpu().numpy()
         pred = np.argmax(pred, axis=1)                                                                                                                              
         target = np.argmax(target, axis=1)                                                                                                                          
         evaluator.add_batch(target, pred)      
@@ -208,7 +209,7 @@ def train(train_loader, model, criterion, optimizer, epoch,writer):
         end = time.time()
 
         # plot progress
-        bar.suffix  = '({batch}/{size}) Data: {data:.3f}s | Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss: {loss:.4f} | Dice_coeff: {Dice_coeff: .4f} | {}: {Iou: .4f}'.format(
+        bar.suffix  = '({batch}/{size}) Data: {data:.3f}s | Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss: {loss:.4f} | Dice_coeff: {Dice_coeff: .4f} | {metric}: {Iou: .4f}'.format(
                     batch=batch_idx + 1,
                     size=len(train_loader),
                     data=data_time.val,
@@ -217,7 +218,7 @@ def train(train_loader, model, criterion, optimizer, epoch,writer):
                     eta=bar.eta_td,
                     loss=losses.avg,
                     Dice_coeff=Dice_coeff.avg,
-                    configs.metric,
+                    metric=configs.metric,
                     Iou=Iou.avg,
                     )
         writer.add_scalar("Train-Loss",losses.avg,epoch)
@@ -257,7 +258,8 @@ def eval(valid_loader, model, criterion, epoch,writer):
             # update
             losses.update(loss.item(), inputs.size(0))
             Dice_coeff.update(dice_batch.item(), inputs.size(0))
-            target = targets.cpu().numpy()                                                                                                                              
+            target = targets.cpu().numpy()                      
+            pred = outputs.data.cpu().numpy()
             pred = np.argmax(pred, axis=1)                                                                                                                              
             target = np.argmax(target, axis=1)                                                                                                                          
             evaluator.add_batch(target, pred)      
@@ -271,7 +273,7 @@ def eval(valid_loader, model, criterion, epoch,writer):
             end = time.time()
 
             # plot progress
-            bar.suffix  = '({batch}/{size}) Data: {data:.3f}s | Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss: {loss:.4f} | Dice_coeff: {Dice_coeff: .4f} | {}: {Iou: .4f}'.format(
+            bar.suffix  = '({batch}/{size}) Data: {data:.3f}s | Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss: {loss:.4f} | Dice_coeff: {Dice_coeff: .4f} | {metric}: {Iou: .4f}'.format(
                         batch=batch_idx + 1,
                         size=len(valid_loader),
                         data=data_time.val,
@@ -280,12 +282,12 @@ def eval(valid_loader, model, criterion, epoch,writer):
                         eta=bar.eta_td,
                         loss=losses.avg,
                         Dice_coeff=Dice_coeff.avg,
-                        configs.metric,
+                        metric=configs.metric,
                         Iou=Iou.avg,
                         )
             bar.next()
             writer.add_scalar("Valid-Loss",losses.avg,epoch)
-            writer.add_scalar("Valid-%s"%configs.metric,,Iou.avg,epoch)
+            writer.add_scalar("Valid-%s"%configs.metric,Iou.avg,epoch)
             writer.add_scalar("Valid-Dice",Dice_coeff.avg,epoch)
         bar.finish()
     return (losses.avg, Dice_coeff.avg, Iou.avg)
