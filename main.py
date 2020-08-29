@@ -218,7 +218,7 @@ def train(train_loader, model, criterion, optimizer, epoch,writer):
                     eta=bar.eta_td,
                     loss=losses.avg,
                     Dice_coeff=Dice_coeff.avg,
-                    metric=configs.metric,
+                    metric=configs.metric[0],
                     Iou=Iou.avg,
                     )
         writer.add_scalar("Train-Loss",losses.avg,epoch)
@@ -282,7 +282,7 @@ def eval(valid_loader, model, criterion, epoch,writer):
                         eta=bar.eta_td,
                         loss=losses.avg,
                         Dice_coeff=Dice_coeff.avg,
-                        metric=configs.metric,
+                        metric=configs.metric[0],
                         Iou=Iou.avg,
                         )
             bar.next()
