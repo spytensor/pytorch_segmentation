@@ -31,7 +31,7 @@ class DefaultConfigs(object):
     metric = "mIoU",#mIOU,FWIou
     use_strong_aug = False  # use strong aug for common dataset
     lr_scheduler = "step" # "on_iou","on_dice","on_loss","cosine"
-    activation = None 
+    activation = "softmax" 
     warmup = True          # use warmup for lr
     warmup_factor = 10
     warmup_epo = 1
